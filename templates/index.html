@@ -284,6 +284,7 @@
 
         document.getElementById('planner-form').addEventListener('submit', async function(e) {
             e.preventDefault();
+            hideError();
             
             const programId = document.getElementById('program').value;
             const semester = document.getElementById('semester').value;
@@ -305,16 +306,39 @@
                 return;
             }
             
-            // Store form data and redirect to academic history page
-            sessionStorage.setItem('plannerData', JSON.stringify({
-                program_id: parseInt(programId),
-                semester: parseInt(semester),
-                max_credits: parseInt(document.getElementById('credits').value),
-                preference: document.querySelector('input[name="preference"]:checked').value,
-                cgpa: cgpa ? parseFloat(cgpa) : null
-            }));
+            // Show loading
+            showLoading(true);
             
-            window.location.href = '/academic-history';
+            // Send request directly to plan API (no academic history needed)
+            try {
+                const response = await fetch('/api/plan', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        program_id: parseInt(programId),
+                        semester: parseInt(semester),
+                        max_credits: parseInt(document.getElementById('credits').value),
+                        preference: document.querySelector('input[name="preference"]:checked').value,
+                        cgpa: cgpa ? parseFloat(cgpa) : 3.0
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to generate plan');
+                }
+                
+                // Store result and redirect to result page
+                sessionStorage.setItem('planResult', JSON.stringify(data));
+                window.location.href = '/result';
+                
+            } catch (error) {
+                showLoading(false);
+                showError(error.message);
+            }
         });
 
         function showLoading(show) {

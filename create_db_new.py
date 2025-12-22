@@ -112,7 +112,7 @@ disciplines_info = [
 
 for prefix, count, topics in disciplines_info:
     difficulty_cycle = ["Easy", "Balanced", "Challenging"]
-    credits = 3  # All courses have 3 credit hours
+    credit_cycle = [2, 3, 3, 3, 4]  # Varied credits: 2, 3, 3, 3, 4 (more 3s for flexibility)
     
     for i in range(count):
         code = f"{prefix}{i+1:03d}"
@@ -121,6 +121,7 @@ for prefix, count, topics in disciplines_info:
         name = f"{topics[topic_idx]} {variant}" if variant > 1 else topics[topic_idx]
         description = f"{name} course content"
         difficulty = difficulty_cycle[i % len(difficulty_cycle)]
+        credits = credit_cycle[i % len(credit_cycle)]
         
         courses.append((course_id, code, name, description, credits, difficulty))
         course_id += 1
@@ -199,10 +200,14 @@ def create_program_mappings():
                                 break
             
             # Add to mappings with prerequisites
+            # CONSTRAINT: Only 1-2 courses per semester should have prerequisites
             for sem in range(1, 9):
-                for course_id in all_semesters_courses[sem]:
+                course_list = list(all_semesters_courses[sem])
+                
+                for idx, course_id in enumerate(course_list):
                     prereq = None
-                    if sem > 1:
+                    # Only assign prerequisites to first 1-2 courses in semester 2+
+                    if sem > 1 and idx < 2:  # Only first 2 courses have prerequisites
                         if discipline == "CS":
                             prereq = "CS001"
                         elif discipline == "EE":

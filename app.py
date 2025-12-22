@@ -1,6 +1,8 @@
 from flask import Flask, render_template, request, jsonify
 import sqlite3
-from itertools import combinations
+from csp import csp_filter, check_prerequisites
+from ga import optimize
+from prolog_interface import get_advice
 
 app = Flask(__name__)
 
@@ -24,6 +26,32 @@ def get_programs(dept_id):
     conn.close()
     return data
 
+def get_completed_courses_from_previous_semesters(program_id, current_semester):
+    """
+    Get all courses from previous semesters for prerequisite checking
+    Assumes student has completed all courses from earlier semesters
+    """
+    if current_semester <= 1:
+        return []
+    
+    conn = sqlite3.connect("university.db")
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    
+    # Get all courses from semesters 1 to (current_semester - 1)
+    cur.execute("""
+        SELECT DISTINCT c.id, c.code, c.name, c.description, c.credits, c.difficulty,
+               pc.semester, pc.prerequisites
+        FROM courses c
+        JOIN program_courses pc ON c.id = pc.course_id
+        WHERE pc.program_id = ? AND pc.semester < ?
+        ORDER BY pc.semester, c.code
+    """, (program_id, current_semester))
+    
+    data = [dict(row) for row in cur.fetchall()]
+    conn.close()
+    return data
+
 def get_courses_for_semester(program_id, semester):
     """Get all courses for a program and semester"""
     conn = sqlite3.connect("university.db")
@@ -41,50 +69,9 @@ def get_courses_for_semester(program_id, semester):
     conn.close()
     return data
 
-def generate_plans(courses, target_credits, preference):
-    """
-    Generate multiple course plans matching the target credits exactly
-    Credit hours remain the same regardless of difficulty preference
-    Ensures total credits stay within 11-24 range
-    """
-    
-    # Use exact target credits - no adjustment based on preference
-    target_credits = max(11, min(24, target_credits))
-    
-    # Generate all combinations that match or are close to target
-    plans = []
-    for r in range(len(courses) + 1):
-        for combo in combinations(courses, r):
-            total = sum(c['credits'] for c in combo)
-            # Accept plans within ±1 credit of target
-            if target_credits - 1 <= total <= target_credits + 1:
-                # Filter by difficulty if specified
-                if preference == 'easy':
-                    difficulty_match = sum(1 for c in combo if c['difficulty'] == 'Easy')
-                elif preference == 'balanced':
-                    difficulty_match = sum(1 for c in combo if c['difficulty'] == 'Balanced')
-                else:  # challenging
-                    difficulty_match = sum(1 for c in combo if c['difficulty'] == 'Challenging')
-                
-                plans.append({
-                    'courses': list(combo),
-                    'total_credits': total,
-                    'course_count': len(combo),
-                    'difficulty_match': difficulty_match
-                })
-    
-    # Sort by: 1) closeness to target, 2) difficulty match, 3) prefer exact target
-    plans.sort(key=lambda x: (abs(x['total_credits'] - target_credits), -x['difficulty_match'], -x['total_credits']))
-    
-    return plans[:5]  # Return top 5 plans
-
 @app.route("/")
 def index():
     return render_template("index.html")
-
-@app.route("/academic-history")
-def academic_history():
-    return render_template("academic_history.html")
 
 @app.route("/result")
 def result():
@@ -98,33 +85,15 @@ def api_departments():
 def api_programs(dept_id):
     return jsonify({'programs': get_programs(dept_id)})
 
-@app.route("/api/all-courses/<int:program_id>", methods=["GET"])
-def api_all_courses(program_id):
-    """Get all courses for a program across all semesters"""
-    try:
-        conn = sqlite3.connect("university.db")
-        conn.row_factory = sqlite3.Row
-        cur = conn.cursor()
-        cur.execute("""
-            SELECT DISTINCT c.id, c.code, c.name, c.description, c.credits, c.difficulty,
-                   pc.semester, pc.prerequisites
-            FROM courses c
-            JOIN program_courses pc ON c.id = pc.course_id
-            WHERE pc.program_id = ?
-            ORDER BY pc.semester, c.code
-        """, (program_id,))
-        data = [dict(row) for row in cur.fetchall()]
-        conn.close()
-        return jsonify({'courses': data})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
 @app.route("/api/plan", methods=["POST"])
 def api_plan():
+    """
+    Generate course plans using CSP + GA + Prolog pipeline
+    No academic history needed - prerequisites checked automatically
+    """
     try:
         data = request.get_json()
         
-        # Log received data for debugging
         print(f"DEBUG: Received data: {data}")
         
         # Validate required fields
@@ -135,18 +104,15 @@ def api_plan():
         semester = data.get('semester')
         target_credits = data.get('max_credits')
         preference = data.get('preference', 'balanced').lower()
-        completed_courses = data.get('completed_courses', [])  # List of course codes
+        cgpa = data.get('cgpa', 3.0)  # Default CGPA for semester 1
         
-        print(f"DEBUG: program_id={program_id}, semester={semester}, target_credits={target_credits}, preference={preference}")
+        print(f"DEBUG: program_id={program_id}, semester={semester}, target_credits={target_credits}, preference={preference}, cgpa={cgpa}")
         
         if not program_id:
-            print(f"ERROR: program_id missing")
             return jsonify({'error': 'Program is required'}), 400
         if semester is None:
-            print(f"ERROR: semester missing")
             return jsonify({'error': 'Semester is required'}), 400
         if not target_credits:
-            print(f"ERROR: target_credits missing: {target_credits}")
             return jsonify({'error': 'Credit hours are required'}), 400
         
         # Convert to proper types
@@ -154,71 +120,100 @@ def api_plan():
             program_id = int(program_id)
             semester = int(semester)
             target_credits = int(target_credits)
+            cgpa = float(cgpa) if cgpa else 3.0
         except (ValueError, TypeError) as e:
-            print(f"ERROR: Conversion failed: {str(e)}")
             return jsonify({'error': f'Invalid input format: {str(e)}'}), 400
         
         # Validate ranges
         if not 1 <= semester <= 8:
-            print(f"ERROR: Semester out of range: {semester}")
             return jsonify({'error': 'Semester must be 1-8'}), 400
         if not 11 <= target_credits <= 24:
-            print(f"ERROR: Credits out of range: {target_credits}")
             return jsonify({'error': 'Credits must be 11-24'}), 400
+        if cgpa and not 0.0 <= cgpa <= 4.0:
+            return jsonify({'error': 'CGPA must be 0.0-4.0'}), 400
         
-        # Get courses for this semester and program
+        # STEP 1: Get courses for this semester
         print(f"DEBUG: Getting courses for program {program_id}, semester {semester}")
         courses = get_courses_for_semester(program_id, semester)
         print(f"DEBUG: Found {len(courses) if courses else 0} courses")
         
         if not courses:
-            print(f"ERROR: No courses available")
             return jsonify({'error': 'No courses available for this semester'}), 404
         
-        # Filter out completed courses
-        completed_set = set(completed_courses)
-        available_courses = [c for c in courses if c['code'] not in completed_set]
-        print(f"DEBUG: Available courses after filtering: {len(available_courses)}")
+        # STEP 2: Get completed courses (all from previous semesters)
+        completed_courses = get_completed_courses_from_previous_semesters(program_id, semester)
+        print(f"DEBUG: Completed courses: {len(completed_courses)}")
         
-        if not available_courses:
-            print(f"ERROR: All courses completed")
-            return jsonify({'error': 'All courses in this semester have been completed'}), 400
+        # STEP 3: Apply CSP - Filter by constraints (prerequisites, credits)
+        print(f"DEBUG: Applying CSP filter with target={target_credits}")
+        valid_plans = csp_filter(courses, target_credits, 11, 24, completed_courses)
+        print(f"DEBUG: CSP generated {len(valid_plans)} valid plans")
         
-        # Generate plans based on preference
-        print(f"DEBUG: Generating plans with target={target_credits}, preference={preference}")
-        plans = generate_plans(available_courses, target_credits, preference)
-        print(f"DEBUG: Generated {len(plans) if plans else 0} plans")
+        if not valid_plans:
+            # Calculate available credits
+            total_available = sum(c['credits'] for c in courses)
+            return jsonify({
+                'error': f'Cannot generate plan with EXACTLY {target_credits} credits. Available courses provide {total_available} total credits. The system requires exact credit match - no combinations of these courses equal {target_credits} credits. Try a different credit amount (11-24).'
+            }), 400
         
-        if not plans:
-            # Calculate max possible credits with available courses
-            max_possible = sum(c['credits'] for c in available_courses)
-            error_msg = f'Not enough courses available. You have {len(available_courses)} course(s) with {max_possible} total credits, but need {target_credits} credits. Try selecting fewer completed courses or choose a different semester.'
-            print(f"ERROR: Could not generate plans. {error_msg}")
-            return jsonify({'error': error_msg}), 400
+        # STEP 4: Apply GA - Optimize plans based on preference
+        print(f"DEBUG: Applying GA optimization with preference={preference}")
+        optimized_plans = optimize(valid_plans, preference, target_credits)
+        print(f"DEBUG: GA selected {len(optimized_plans)} optimal plans")
         
-        # Return plans with all course details
+        if not optimized_plans:
+            return jsonify({'error': 'Could not optimize plans'}), 400
+        
+        # STEP 5: Apply Prolog Expert System - Get advice for each plan
+        print(f"DEBUG: Getting Prolog advice for each plan")
+        final_plans = []
+        
+        for plan in optimized_plans:
+            # Verify exact credit match (should always be true)
+            if plan['total_credits'] != target_credits:
+                print(f"WARNING: Plan has {plan['total_credits']} credits, expected {target_credits}")
+                continue  # Skip plans that don't match exactly
+            
+            advice = get_advice(cgpa, plan['courses'])
+            
+            # Add prerequisite warning if any violations exist
+            if not plan.get('all_prereqs_met', True):
+                violations = plan.get('constraint_violations', 0)
+                prereq_warning = f"⚠️ NOTE: {violations} course(s) in this plan have unmet prerequisites. Alternative courses were selected to meet your EXACT {target_credits} credit requirement."
+                if 'warnings' not in advice:
+                    advice['warnings'] = []
+                advice['warnings'].insert(0, prereq_warning)
+            else:
+                # Add confirmation that credits are exact
+                if 'advice' not in advice:
+                    advice['advice'] = []
+                advice['advice'].insert(0, f"✓ This plan provides EXACTLY {target_credits} credits as requested")
+            
+            final_plans.append({
+                'total_credits': plan['total_credits'],
+                'course_count': len(plan['courses']),
+                'all_prereqs_met': plan.get('all_prereqs_met', True),
+                'courses': [
+                    {
+                        'code': c['code'],
+                        'name': c['name'],
+                        'description': c['description'],
+                        'credits': c['credits'],
+                        'difficulty': c['difficulty'],
+                        'semester': semester,
+                        'prerequisites': c['prerequisites']
+                    }
+                    for c in plan['courses']
+                ],
+                'expert_advice': advice  # Prolog-based advice
+            })
+        
         response = {
             'success': True,
-            'completed_courses': completed_courses,
-            'plans': [
-                {
-                    'total_credits': plan['total_credits'],
-                    'course_count': plan['course_count'],
-                    'courses': [
-                        {
-                            'code': c['code'],
-                            'name': c['name'],
-                            'description': c['description'],
-                            'credits': c['credits'],
-                            'difficulty': c['difficulty'],
-                            'semester': semester,
-                            'prerequisites': c['prerequisites']
-                        }
-                        for c in plan['courses']
-                    ]
-                }
-                for plan in plans
-            ]
+            'semester': semester,
+            'cgpa': cgpa,
+            'plans': final_plans,
+            'method': 'CSP + GA + Prolog Expert System'
         }
         
         return jsonify(response)
@@ -228,35 +223,6 @@ def api_plan():
         import traceback
         traceback.print_exc()
         return jsonify({'error': f'Server error: {str(e)}'}), 500
-
-@app.route("/api/validate-prerequisites", methods=["POST"])
-def api_validate_prerequisites():
-    """Check if student has passed prerequisites"""
-    try:
-        data = request.get_json()
-        completed_courses = data.get('completed_courses', [])
-        courses_in_plan = data.get('courses_in_plan', [])
-        
-        issues = []
-        for course in courses_in_plan:
-            prereqs = course.get('prerequisites', '').strip()
-            if prereqs and prereqs != '':
-                needed = set(p.strip() for p in prereqs.split(','))
-                completed = set(completed_courses)
-                missing = needed - completed
-                if missing:
-                    issues.append({
-                        'course': course['code'],
-                        'missing_prereqs': list(missing)
-                    })
-        
-        return jsonify({
-            'valid': len(issues) == 0,
-            'issues': issues
-        })
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
 
 if __name__ == "__main__":
     app.run(debug=True)
