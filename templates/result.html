@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Semester Plan</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            padding: 40px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .plan-summary {
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            border-left: 4px solid #667eea;
+        }
+        .summary-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .summary-item strong {
+            color: #333;
+        }
+        .summary-item span {
+            color: #667eea;
+            font-weight: bold;
+        }
+        .courses-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .course-card {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .course-card:hover {
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+            transform: translateY(-5px);
+        }
+        .course-code {
+            font-weight: bold;
+            color: #667eea;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+        .course-name {
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .course-description {
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 12px;
+            line-height: 1.5;
+        }
+        .course-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1px solid #eee;
+            padding-top: 12px;
+        }
+        .course-credits {
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .course-difficulty {
+            font-size: 12px;
+            font-weight: bold;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+        .difficulty-easy {
+            background: #c8e6c9;
+            color: #2e7d32;
+        }
+        .difficulty-balanced {
+            background: #fff9c4;
+            color: #f57f17;
+        }
+        .difficulty-challenging {
+            background: #ffccbc;
+            color: #d84315;
+        }
+        .button-group {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+        button, a {
+            padding: 12px 30px;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: bold;
+            border: none;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+            border: 2px solid #667eea;
+        }
+        .btn-secondary:hover {
+            background: #667eea;
+            color: white;
+        }
+        .alternatives-section {
+            margin-top: 40px;
+        }
+        .alternatives-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .alt-tabs {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+        }
+        .alt-tab {
+            padding: 12px;
+            background: #f0f0f0;
+            border: 2px solid transparent;
+            border-radius: 5px;
+            cursor: pointer;
+            text-align: center;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        .alt-tab.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+        .alt-tab:hover {
+            border-color: #667eea;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.6);
+            z-index: 1000;
+        }
+        .modal.active {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            max-width: 500px;
+            width: 90%;
+        }
+        .modal-title {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            color: #333;
+        }
+        .prereq-item {
+            background: #fff3cd;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            border-left: 4px solid #ffc107;
+        }
+        .prereq-course {
+            font-weight: bold;
+            color: #333;
+        }
+        .prereq-missing {
+            color: #d32f2f;
+            margin-top: 8px;
+        }
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .modal-buttons button {
+            flex: 1;
+        }
+        .empty-message {
+            text-align: center;
+            color: #999;
+            padding: 40px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📋 Your Semester Plan</h1>
+        
+        <div class="plan-summary" id="summary">
+            <div class="summary-item">
+                <strong>Total Credits:</strong>
+                <span id="total-credits">0</span>
+            </div>
+            <div class="summary-item">
+                <strong>Course Count:</strong>
+                <span id="course-count">0</span>
+            </div>
+        </div>
+
+        <div id="completed-courses-info" style="display: none; background: #c8e6c9; border-left: 4px solid #2e7d32; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
+            <strong style="color: #2e7d32;">✓ Completed Courses Excluded</strong>
+            <p style="margin-top: 8px; font-size: 13px; color: #555;" id="completed-list"></p>
+        </div>
+        
+        <div class="button-group">
+            <a href="/" class="btn-secondary">← Back to Planner</a>
+            <button class="btn-primary" onclick="printPlan()">🖨️ Print Plan</button>
+        </div>
+        
+        <h2 style="margin-bottom: 20px; color: #333;">Primary Plan</h2>
+        <div class="courses-grid" id="primary-plan"></div>
+        
+        <div class="alternatives-section" id="alternatives-container" style="display: none;">
+            <div class="alternatives-header">
+                <h2 style="color: #333;">Alternative Plans</h2>
+            </div>
+            <div class="alt-tabs" id="alt-tabs"></div>
+            <div class="courses-grid" id="alternative-plan" style="margin-top: 20px;"></div>
+        </div>
+        
+        <!-- Prerequisite Modal -->
+        <div class="modal" id="prereq-modal">
+            <div class="modal-content">
+                <div class="modal-title">Prerequisites Check</div>
+                <p>Some courses have prerequisites. Check the ones you've completed below:</p>
+                <div id="prereq-list" style="max-height: 400px; overflow-y: auto;"></div>
+                <div class="modal-buttons">
+                    <button class="btn-secondary" onclick="removeMissingPrereqs()">Replace with Alternatives</button>
+                    <button class="btn-primary" onclick="acceptPlanWithPrereqs()">Accept Plan Anyway</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let allPlans = [];
+        let currentAltIndex = 0;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const result = sessionStorage.getItem('planResult');
+            if (result) {
+                const data = JSON.parse(result);
+                displayResults(data);
+                sessionStorage.removeItem('planResult');
+            } else {
+                window.location.href = '/';
+            }
+        });
+
+        function displayResults(data) {
+            if (!data.plans || data.plans.length === 0) {
+                document.getElementById('primary-plan').innerHTML = 
+                    '<div class="empty-message">No courses available for this semester.</div>';
+                return;
+            }
+
+            allPlans = data.plans;
+            
+            // Display completed courses if any
+            if (data.completed_courses && data.completed_courses.length > 0) {
+                const completedInfo = document.getElementById('completed-courses-info');
+                const completedList = document.getElementById('completed-list');
+                completedInfo.style.display = 'block';
+                completedList.textContent = `${data.completed_courses.length} course(s) excluded from this plan: ${data.completed_courses.join(', ')}`;
+            }
+            
+            // Display primary plan
+            displayPlan(data.plans[0], 'primary-plan');
+            
+            // Check for prerequisites
+            if (data.plans[0].courses.some(c => c.prerequisites && c.prerequisites.trim())) {
+                showPrerequisiteModal(data.plans[0]);
+            }
+            
+            // Display alternatives if available
+            if (data.plans.length > 1) {
+                document.getElementById('alternatives-container').style.display = 'block';
+                const tabsContainer = document.getElementById('alt-tabs');
+                
+                for (let i = 1; i < data.plans.length; i++) {
+                    const tab = document.createElement('div');
+                    tab.className = 'alt-tab' + (i === 1 ? ' active' : '');
+                    tab.textContent = `Alternative ${i}`;
+                    tab.onclick = () => switchAlternative(i);
+                    tabsContainer.appendChild(tab);
+                }
+                
+                // Display first alternative
+                displayPlan(data.plans[1], 'alternative-plan');
+            }
+        }
+
+        function displayPlan(plan, containerId) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+            
+            // Update summary
+            document.getElementById('total-credits').textContent = plan.total_credits;
+            document.getElementById('course-count').textContent = plan.course_count;
+            
+            plan.courses.forEach(course => {
+                const card = document.createElement('div');
+                card.className = 'course-card';
+                
+                const diffClass = `difficulty-${course.difficulty.toLowerCase()}`;
+                
+                card.innerHTML = `
+                    <div class="course-code">${course.code}</div>
+                    <div class="course-name">${course.name}</div>
+                    <div class="course-description">${course.description}</div>
+                    <div class="course-meta">
+                        <span class="course-credits">${course.credits} Credits</span>
+                        <span class="course-difficulty ${diffClass}">${course.difficulty}</span>
+                    </div>
+                `;
+                
+                container.appendChild(card);
+            });
+        }
+
+        function switchAlternative(index) {
+            currentAltIndex = index;
+            
+            // Update active tab
+            document.querySelectorAll('.alt-tab').forEach((tab, i) => {
+                tab.classList.toggle('active', i === index - 1);
+            });
+            
+            // Display plan
+            displayPlan(allPlans[index], 'alternative-plan');
+        }
+
+        function showPrerequisiteModal(plan) {
+            const prereqList = document.getElementById('prereq-list');
+            prereqList.innerHTML = '';
+            
+            const coursesWithPrereqs = plan.courses.filter(c => c.prerequisites && c.prerequisites.trim());
+            
+            if (coursesWithPrereqs.length > 0) {
+                coursesWithPrereqs.forEach(course => {
+                    const prereqs = course.prerequisites.split(',').map(p => p.trim());
+                    const item = document.createElement('div');
+                    item.className = 'prereq-item';
+                    
+                    let prereqCheckboxes = '<div style="margin-top: 10px;">';
+                    prereqs.forEach((prereq, idx) => {
+                        const checkboxId = `prereq-${course.code}-${idx}`;
+                        prereqCheckboxes += `
+                            <label style="display: block; margin: 5px 0; font-size: 14px;">
+                                <input type="checkbox" id="${checkboxId}" class="prereq-check" data-course="${course.code}">
+                                <span>${prereq}</span>
+                            </label>
+                        `;
+                    });
+                    prereqCheckboxes += '</div>';
+                    
+                    item.innerHTML = `
+                        <div class="prereq-course">${course.code}: ${course.name}</div>
+                        <div style="font-size: 13px; color: #666; margin-top: 8px;">Check the prerequisites you have completed:</div>
+                        ${prereqCheckboxes}
+                    `;
+                    prereqList.appendChild(item);
+                });
+                
+                document.getElementById('prereq-modal').classList.add('active');
+            }
+        }
+
+        function removeMissingPrereqs() {
+            // Get all available plans to find alternative courses
+            const allAvailableCourses = new Map();
+            allPlans.forEach(plan => {
+                plan.courses.forEach(course => {
+                    if (!allAvailableCourses.has(course.code)) {
+                        allAvailableCourses.set(course.code, course);
+                    }
+                });
+            });
+            
+            // Find courses with unmet prerequisites
+            const coursesToReplace = [];
+            const currentPlan = allPlans[0];
+            
+            document.querySelectorAll('.prereq-item').forEach(item => {
+                const courseCode = item.querySelector('.prereq-course').textContent.split(':')[0];
+                const checkboxes = item.querySelectorAll('.prereq-check');
+                const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+                
+                if (!allChecked && checkboxes.length > 0) {
+                    const course = currentPlan.courses.find(c => c.code === courseCode);
+                    if (course) {
+                        coursesToReplace.push(course);
+                    }
+                }
+            });
+            
+            if (coursesToReplace.length > 0) {
+                // Find alternative courses (courses not in current plan or without unmet prerequisites)
+                const currentCourseCodes = new Set(currentPlan.courses.map(c => c.code));
+                const alternativeCourses = [];
+                
+                allAvailableCourses.forEach((course, code) => {
+                    if (!currentCourseCodes.has(code)) {
+                        // Check if this alternative course has unmet prerequisites
+                        if (!course.prerequisites || !course.prerequisites.trim()) {
+                            alternativeCourses.push(course);
+                        }
+                    }
+                });
+                
+                // Replace courses intelligently
+                let replacedCount = 0;
+                const targetCredits = currentPlan.total_credits;
+                let currentCredits = currentPlan.total_credits;
+                const newCourses = currentPlan.courses.filter(c => !coursesToReplace.some(r => r.code === c.code));
+                
+                for (let i = 0; i < coursesToReplace.length && alternativeCourses.length > 0; i++) {
+                    const courseToReplace = coursesToReplace[i];
+                    const creditDeficit = courseToReplace.credits;
+                    
+                    // Find best alternative matching the credit value
+                    let bestMatch = null;
+                    let bestMatchIndex = -1;
+                    let closestDifference = Infinity;
+                    
+                    for (let j = 0; j < alternativeCourses.length; j++) {
+                        const altCourse = alternativeCourses[j];
+                        const difference = Math.abs(altCourse.credits - creditDeficit);
+                        
+                        if (difference < closestDifference && !newCourses.some(c => c.code === altCourse.code)) {
+                            closestDifference = difference;
+                            bestMatch = altCourse;
+                            bestMatchIndex = j;
+                        }
+                    }
+                    
+                    if (bestMatch) {
+                        newCourses.push(bestMatch);
+                        currentCredits = currentCredits - creditDeficit + bestMatch.credits;
+                        alternativeCourses.splice(bestMatchIndex, 1);
+                        replacedCount++;
+                    }
+                }
+                
+                // Update plan
+                currentPlan.courses = newCourses;
+                currentPlan.course_count = newCourses.length;
+                currentPlan.total_credits = newCourses.reduce((sum, c) => sum + c.credits, 0);
+                
+                displayPlan(currentPlan, 'primary-plan');
+                document.getElementById('prereq-modal').classList.remove('active');
+                alert(`Replaced ${replacedCount} course(s) with alternatives.\nNew Total: ${newCourses.length} courses, ${currentPlan.total_credits} credits`);
+            } else {
+                document.getElementById('prereq-modal').classList.remove('active');
+            }
+        }
+
+        function acceptPlanWithPrereqs() {
+            document.getElementById('prereq-modal').classList.remove('active');
+        }
+
+        function printPlan() {
+            window.print();
+        }
+    </script>
+</body>
+</html>

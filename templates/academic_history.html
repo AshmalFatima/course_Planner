@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Academic History</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            padding: 40px;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        .instruction {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 30px;
+            color: #555;
+        }
+        .courses-container {
+            margin-bottom: 30px;
+        }
+        .semester-group {
+            margin-bottom: 30px;
+        }
+        .semester-header {
+            background: #667eea;
+            color: white;
+            padding: 12px;
+            border-radius: 5px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .semester-header.invalid {
+            background: #d32f2f;
+        }
+        .semester-credits {
+            font-size: 13px;
+            background: rgba(255,255,255,0.2);
+            padding: 4px 10px;
+            border-radius: 3px;
+        }
+        .courses-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 15px;
+        }
+        .course-item {
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: white;
+        }
+        .course-item:hover {
+            border-color: #667eea;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+        }
+        .course-item.selected {
+            background: #e3f2fd;
+            border-color: #2196f3;
+            box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3);
+        }
+        .course-code {
+            color: #667eea;
+            font-weight: bold;
+            font-size: 13px;
+            margin-bottom: 5px;
+        }
+        .course-name {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 8px;
+        }
+        .course-credits {
+            background: #f0f0f0;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-size: 12px;
+            color: #666;
+            display: inline-block;
+        }
+        .checkbox-indicator {
+            float: right;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #ddd;
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: white;
+            background: white;
+            margin-top: -5px;
+        }
+        .course-item.selected .checkbox-indicator {
+            background: #2196f3;
+            border-color: #2196f3;
+        }
+        .course-item.selected .checkbox-indicator::after {
+            content: "✓";
+        }
+        .button-group {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 30px;
+        }
+        button {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+            border: 2px solid #667eea;
+        }
+        .btn-secondary:hover {
+            background: #667eea;
+            color: white;
+        }
+        .summary {
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #667eea;
+        }
+        .summary-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        .summary-item strong {
+            color: #333;
+        }
+        .summary-item span {
+            color: #667eea;
+            font-weight: bold;
+        }
+        .credit-warning {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 12px;
+            border-radius: 5px;
+            margin-top: 15px;
+            color: #856404;
+            display: none;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            display: none;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .error {
+            color: #d32f2f;
+            padding: 10px;
+            background: #ffebee;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📚 Your Academic History</h1>
+        <p class="subtitle">Select courses you have already completed</p>
+        
+        <div class="instruction">
+            <strong>📌 Instructions:</strong> Click on courses you have already completed. Select between 11-24 credit hours per semester.
+        </div>
+
+        <div class="error" id="error-msg"></div>
+
+        <div class="summary">
+            <div class="summary-item">
+                <strong>Program:</strong>
+                <span id="program-name">-</span>
+            </div>
+            <div class="summary-item">
+                <strong>Semester:</strong>
+                <span id="semester-name">-</span>
+            </div>
+            <div class="summary-item">
+                <strong>Courses Selected:</strong>
+                <span id="completed-count">0</span>
+            </div>
+            <div class="summary-item">
+                <strong>Total Credits:</strong>
+                <span id="total-credits">0</span>
+            </div>
+        </div>
+        <div class="credit-warning" id="credit-warning">
+            ⚠️ Please select courses totaling between 11-24 credit hours per semester.
+        </div>
+        
+        <div class="courses-container" id="courses-container"></div>
+        
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Generating your semester plan...</p>
+        </div>
+        
+        <div class="button-group">
+            <button class="btn-secondary" onclick="goBack()">← Back</button>
+            <button class="btn-primary" onclick="continueToPlan()">Generate Plan →</button>
+        </div>
+    </div>
+
+    <script>
+        let plannerData = null;
+        let allCourses = [];
+        let selectedCoursesData = new Map(); // Store course code -> course object
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Get planner data from session
+            const data = sessionStorage.getItem('plannerData');
+            if (!data) {
+                window.location.href = '/';
+                return;
+            }
+
+            plannerData = JSON.parse(data);
+            await loadCourses();
+        });
+
+        async function loadCourses() {
+            try {
+                const response = await fetch(`/api/all-courses/${plannerData.program_id}`);
+                const data = await response.json();
+                allCourses = data.courses || [];
+
+                // Display program and semester info
+                displayProgramInfo();
+                // Display courses organized by semester
+                displayCourses();
+                // Initialize credit validation
+                validateCredits();
+            } catch (error) {
+                showError('Failed to load courses: ' + error.message);
+            }
+        }
+
+        function displayProgramInfo() {
+            // Get program name from a separate request or display ID
+            document.getElementById('program-name').textContent = `Program #${plannerData.program_id}`;
+            document.getElementById('semester-name').textContent = `Semester ${plannerData.semester}`;
+        }
+
+        function displayCourses() {
+            const container = document.getElementById('courses-container');
+            container.innerHTML = '';
+
+            // Group courses by semester, but exclude current semester and only show up to it
+            const coursesBySemester = {};
+            allCourses.forEach(course => {
+                // Only include courses from semesters BEFORE the selected semester (completed courses)
+                if (course.semester < plannerData.semester) {
+                    const sem = course.semester;
+                    if (!coursesBySemester[sem]) {
+                        coursesBySemester[sem] = [];
+                    }
+                    coursesBySemester[sem].push(course);
+                }
+            });
+
+            if (Object.keys(coursesBySemester).length === 0) {
+                const noCoursesDiv = document.createElement('div');
+                noCoursesDiv.style.textAlign = 'center';
+                noCoursesDiv.style.padding = '40px';
+                noCoursesDiv.style.color = '#999';
+                noCoursesDiv.innerHTML = '<p>No completed courses yet (you are in semester 1 or planning your first semester)</p>';
+                container.appendChild(noCoursesDiv);
+                return;
+            }
+
+            // Display each semester
+            Object.keys(coursesBySemester).sort((a, b) => a - b).forEach(semester => {
+                const semesterDiv = document.createElement('div');
+                semesterDiv.className = 'semester-group';
+
+                const header = document.createElement('div');
+                header.className = 'semester-header';
+                header.setAttribute('data-semester', semester);
+                header.innerHTML = `
+                    <span>Semester ${semester} (Completed)</span>
+                    <span class="semester-credits" id="sem-${semester}-credits">0 / 11-24 credits</span>
+                `;
+
+                const coursesGrid = document.createElement('div');
+                coursesGrid.className = 'courses-grid';
+
+                coursesBySemester[semester].forEach(course => {
+                    const courseDiv = document.createElement('div');
+                    courseDiv.className = 'course-item';
+                    courseDiv.onclick = () => toggleCourse(course, courseDiv);
+                    courseDiv.innerHTML = `
+                        <div class="checkbox-indicator"></div>
+                        <div class="course-code">${course.code}</div>
+                        <div class="course-name">${course.name}</div>
+                        <span class="course-credits">${course.credits} Credits</span>
+                    `;
+                    coursesGrid.appendChild(courseDiv);
+                });
+
+                semesterDiv.appendChild(header);
+                semesterDiv.appendChild(coursesGrid);
+                container.appendChild(semesterDiv);
+            });
+        }
+
+        function toggleCourse(course, courseDiv) {
+            if (selectedCoursesData.has(course.code)) {
+                selectedCoursesData.delete(course.code);
+                courseDiv.classList.remove('selected');
+            } else {
+                selectedCoursesData.set(course.code, course);
+                courseDiv.classList.add('selected');
+            }
+            updateCompletedCount();
+            validateCredits();
+        }
+
+        function updateDisplay() {
+            document.querySelectorAll('.course-item').forEach(item => {
+                const courseCode = item.querySelector('.course-code').textContent;
+                if (selectedCoursesData.has(courseCode)) {
+                    item.classList.add('selected');
+                } else {
+                    item.classList.remove('selected');
+                }
+            });
+            updateCompletedCount();
+            validateCredits();
+        }
+
+        function updateCompletedCount() {
+            const totalCredits = Array.from(selectedCoursesData.values())
+                .reduce((sum, course) => sum + course.credits, 0);
+            document.getElementById('completed-count').textContent = selectedCoursesData.size;
+            document.getElementById('total-credits').textContent = totalCredits;
+        }
+
+        function validateCredits() {
+            // Calculate credits per semester
+            const creditsBySemester = {};
+            Array.from(selectedCoursesData.values()).forEach(course => {
+                const semester = parseInt(course.semester);
+                const credits = parseInt(course.credits);
+                
+                if (!creditsBySemester[semester]) {
+                    creditsBySemester[semester] = 0;
+                }
+                creditsBySemester[semester] += credits;
+            });
+
+            // Update each semester header with credit count
+            const invalidSemesters = [];
+            Object.keys(creditsBySemester).forEach(semester => {
+                const credits = creditsBySemester[semester];
+                const creditSpan = document.getElementById(`sem-${semester}-credits`);
+                const header = document.querySelector(`[data-semester="${semester}"]`);
+                
+                if (creditSpan) {
+                    creditSpan.textContent = `${credits} / 11-24 credits`;
+                    
+                    if (credits < 11 || credits > 24) {
+                        creditSpan.style.background = 'rgba(255,255,255,0.3)';
+                        if (header) header.classList.add('invalid');
+                        invalidSemesters.push({sem: semester, credits: credits});
+                    } else {
+                        creditSpan.style.background = 'rgba(255,255,255,0.2)';
+                        if (header) header.classList.remove('invalid');
+                    }
+                }
+            });
+
+            // Update semesters with 0 credits (semesters that exist but have no selected courses)
+            document.querySelectorAll('[data-semester]').forEach(header => {
+                const semester = header.getAttribute('data-semester');
+                if (!creditsBySemester[semester]) {
+                    const creditSpan = document.getElementById(`sem-${semester}-credits`);
+                    if (creditSpan) {
+                        creditSpan.textContent = '0 / 11-24 credits';
+                        header.classList.add('invalid');
+                        if (parseInt(semester) < plannerData.semester) {
+                            invalidSemesters.push({sem: semester, credits: 0});
+                        }
+                    }
+                }
+            });
+
+            // Display warning
+            const warningDiv = document.getElementById('credit-warning');
+            if (invalidSemesters.length > 0) {
+                warningDiv.style.display = 'block';
+                const semList = invalidSemesters.map(s => `Semester ${s.sem} (${s.credits} credits)`).join(', ');
+                warningDiv.innerHTML = `⚠️ Invalid credit hours: ${semList}. Each completed semester must have 11-24 credits.`;
+                return false;
+            } else {
+                warningDiv.style.display = 'none';
+                return true;
+            }
+        }
+
+        async function continueToPlan() {
+            // Validate credits before continuing
+            if (!validateCredits()) {
+                showError('Please ensure all completed semesters have 11-24 credit hours selected.');
+                return;
+            }
+            
+            try {
+                document.getElementById('loading').style.display = 'block';
+                document.querySelector('.container').style.opacity = '0.5';
+
+                const response = await fetch('/api/plan', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        program_id: plannerData.program_id,
+                        semester: plannerData.semester,
+                        max_credits: plannerData.max_credits,
+                        preference: plannerData.preference,
+                        cgpa: plannerData.cgpa,
+                        completed_courses: Array.from(selectedCoursesData.keys())
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    sessionStorage.setItem('planResult', JSON.stringify(data));
+                    sessionStorage.removeItem('plannerData');
+                    window.location.href = '/result';
+                } else {
+                    const errorMsg = data.error || 'Failed to generate plan';
+                    console.error('Plan generation error:', errorMsg, data);
+                    showError(errorMsg);
+                    document.getElementById('loading').style.display = 'none';
+                    document.querySelector('.container').style.opacity = '1';
+                }
+            } catch (error) {
+                console.error('Fetch error:', error);
+                showError('Error: ' + error.message);
+                document.getElementById('loading').style.display = 'none';
+                document.querySelector('.container').style.opacity = '1';
+            }
+        }
+
+        function goBack() {
+            sessionStorage.removeItem('plannerData');
+            window.location.href = '/';
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error-msg');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+    </script>
+</body>
+</html>
