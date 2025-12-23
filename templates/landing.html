@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduPlan AI - Smart University Planner</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+        }
+
+        /* Hero Section */
+        .hero {
+            background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+            color: #2c3e50;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320"><path fill="rgba(255,255,255,0.5)" d="M0,96L48,112C96,128,192,160,288,160C384,160,480,128,576,122.7C672,117,768,139,864,154.7C960,171,1056,181,1152,165.3C1248,149,1344,107,1392,85.3L1440,64L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path></svg>') no-repeat bottom;
+            background-size: cover;
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 1;
+            max-width: 800px;
+        }
+
+        .hero h1 {
+            font-size: 3.5rem;
+            margin-bottom: 20px;
+            animation: fadeInDown 1s ease-out;
+        }
+
+        .hero .tagline {
+            font-size: 1.3rem;
+            margin-bottom: 30px;
+            opacity: 0.95;
+            animation: fadeInUp 1s ease-out 0.2s both;
+        }
+
+        .hero .cta-button {
+            display: inline-block;
+            padding: 15px 40px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 50px;
+            font-weight: bold;
+            font-size: 1.1rem;
+            transition: transform 0.3s, box-shadow 0.3s;
+            animation: fadeInUp 1s ease-out 0.4s both;
+        }
+
+        .hero .cta-button:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.5);
+        }
+
+        /* Section Styles */
+        section {
+            padding: 80px 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        section h2 {
+            font-size: 2.5rem;
+            text-align: center;
+            margin-bottom: 50px;
+            color: #333;
+            position: relative;
+        }
+
+        section h2::after {
+            content: '';
+            display: block;
+            width: 80px;
+            height: 4px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 20px auto 0;
+            border-radius: 2px;
+        }
+
+        /* Mission Section */
+        .mission {
+            background: #f8f9fa;
+        }
+
+        .mission-content {
+            text-align: center;
+            max-width: 800px;
+            margin: 0 auto;
+            font-size: 1.2rem;
+            line-height: 1.8;
+        }
+
+        .mission-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 30px;
+            margin-top: 50px;
+        }
+
+        .mission-card {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transition: transform 0.3s;
+        }
+
+        .mission-card:hover {
+            transform: translateY(-10px);
+        }
+
+        .mission-card .icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+        }
+
+        .mission-card h3 {
+            font-size: 1.3rem;
+            margin-bottom: 10px;
+            color: #667eea;
+        }
+
+        /* About Section */
+        .about {
+            background: white;
+        }
+
+        .about-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 50px;
+            align-items: center;
+        }
+
+        .about-text h3 {
+            font-size: 1.8rem;
+            margin-bottom: 20px;
+            color: #667eea;
+        }
+
+        .about-text p {
+            font-size: 1.1rem;
+            margin-bottom: 15px;
+            line-height: 1.8;
+        }
+
+        .about-features {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .feature-item {
+            display: flex;
+            align-items: start;
+            gap: 15px;
+        }
+
+        .feature-item .icon {
+            font-size: 2rem;
+            color: #667eea;
+        }
+
+        /* Departments Section */
+        .departments {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        }
+
+        .dept-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-top: 50px;
+        }
+
+        .dept-card {
+            background: white;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            transition: transform 0.3s, box-shadow 0.3s;
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+
+        .dept-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .dept-header {
+            background: linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .dept-header .icon {
+            font-size: 3.5rem;
+            margin-bottom: 10px;
+        }
+
+        .dept-header h3 {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        .dept-body {
+            padding: 25px;
+            text-align: center;
+        }
+
+        .dept-body p {
+            color: #666;
+            margin-bottom: 20px;
+        }
+
+        .dept-body .btn {
+            display: inline-block;
+            padding: 10px 30px;
+            background: linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%);
+            color: white;
+            border-radius: 25px;
+            text-decoration: none;
+            font-weight: bold;
+            transition: opacity 0.3s;
+        }
+
+        .dept-body .btn:hover {
+            opacity: 0.9;
+        }
+
+        /* Footer */
+        footer {
+            background: #2c3e50;
+            color: white;
+            text-align: center;
+            padding: 30px 20px;
+        }
+
+        /* Animations */
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 2.5rem;
+            }
+
+            .hero .tagline {
+                font-size: 1.1rem;
+            }
+
+            .about-content {
+                grid-template-columns: 1fr;
+            }
+
+            section h2 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Hero Section -->
+    <div class="hero">
+        <div class="hero-content">
+            <h1>🎓 EduPlan AI</h1>
+            <p class="tagline">Your Smart University Semester Planner powered by AI</p>
+            <a href="#departments" class="cta-button">Get Started →</a>
+        </div>
+    </div>
+
+    <!-- Mission Section -->
+    <section class="mission">
+        <h2>Our Mission</h2>
+        <div class="mission-content">
+            <p>
+                We empower students to make intelligent academic decisions through cutting-edge AI technology. 
+                EduPlan AI combines Constraint Satisfaction, Genetic Algorithms, and Expert Systems to create 
+                personalized course plans that match your academic goals and preferences.
+            </p>
+        </div>
+        <div class="mission-cards">
+            <div class="mission-card">
+                <div class="icon">🎯</div>
+                <h3>Smart Planning</h3>
+                <p>AI-powered course selection that considers prerequisites, credits, and difficulty levels</p>
+            </div>
+            <div class="mission-card">
+                <div class="icon">⚡</div>
+                <h3>Instant Results</h3>
+                <p>Generate multiple optimized semester plans in seconds, not hours</p>
+            </div>
+            <div class="mission-card">
+                <div class="icon">🧠</div>
+                <h3>Expert Advice</h3>
+                <p>Prolog-based expert system provides personalized recommendations based on your CGPA</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- About Section -->
+    <section class="about">
+        <h2>About EduPlan AI</h2>
+        <div class="about-content">
+            <div class="about-text">
+                <h3>Revolutionizing Academic Planning</h3>
+                <p>
+                    EduPlan AI is an intelligent course planning system developed with three powerful AI techniques 
+                    working in harmony to deliver the perfect semester plan.
+                </p>
+                <p>
+                    Unlike traditional planners, we don't just list courses – we analyze constraints, optimize 
+                    for your preferences, and provide expert guidance every step of the way.
+                </p>
+            </div>
+            <div class="about-features">
+                <div class="feature-item">
+                    <div class="icon">🔍</div>
+                    <div>
+                        <h4>CSP Filtering</h4>
+                        <p>Ensures all plans meet exact credit requirements and prerequisite constraints</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="icon">🧬</div>
+                    <div>
+                        <h4>Genetic Algorithm</h4>
+                        <p>Optimizes course selection based on difficulty preference and workload balance</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="icon">🎓</div>
+                    <div>
+                        <h4>Expert System</h4>
+                        <p>Provides academic advice and risk assessment based on your CGPA and course load</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Departments Section -->
+    <section class="departments" id="departments">
+        <h2>Choose Your Department</h2>
+        <p style="text-align: center; font-size: 1.2rem; margin-bottom: 30px; color: #666;">
+            Select your department to start planning your semester
+        </p>
+        <div class="dept-grid" id="dept-grid">
+            <!-- Departments will be loaded dynamically -->
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <p>&copy; 2025 EduPlan AI. All rights reserved.</p>
+        <p style="margin-top: 10px; opacity: 0.8;">Powered by CSP, Genetic Algorithms & Prolog Expert System</p>
+    </footer>
+
+    <script>
+        // Department icons mapping
+        const deptIcons = {
+            'Computer Science': '💻',
+            'Electrical Engineering': '⚡',
+            'Mechanical Engineering': '⚙️',
+            'Civil Engineering': '🏗️',
+            'Business Administration': '💼',
+            'Software Engineering': '🖥️'
+        };
+
+        // Load departments on page load
+        window.addEventListener('DOMContentLoaded', async () => {
+            await loadDepartments();
+        });
+
+        async function loadDepartments() {
+            try {
+                const response = await fetch('/api/departments');
+                const data = await response.json();
+                const grid = document.getElementById('dept-grid');
+                
+                data.departments.forEach(dept => {
+                    const card = document.createElement('a');
+                    card.href = `/planner?dept=${dept.id}`;
+                    card.className = 'dept-card';
+                    
+                    const icon = deptIcons[dept.name] || '📚';
+                    
+                    card.innerHTML = `
+                        <div class="dept-header">
+                            <div class="icon">${icon}</div>
+                            <h3>${dept.name}</h3>
+                        </div>
+                        <div class="dept-body">
+                            <p>Plan your semester with AI-powered course selection</p>
+                            <span class="btn">Start Planning →</span>
+                        </div>
+                    `;
+                    
+                    grid.appendChild(card);
+                });
+            } catch (error) {
+                console.error('Failed to load departments:', error);
+            }
+        }
+
+        // Smooth scroll for CTA button
+        document.querySelector('.cta-button').addEventListener('click', (e) => {
+            e.preventDefault();
+            document.querySelector('#departments').scrollIntoView({ behavior: 'smooth' });
+        });
+    </script>
+</body>
+</html>

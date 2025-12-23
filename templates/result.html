@@ -8,7 +8,7 @@
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
             min-height: 100vh;
             padding: 20px;
         }
@@ -244,6 +244,10 @@
         
         <div class="plan-summary" id="summary">
             <div class="summary-item">
+                <strong>Semester:</strong>
+                <span id="semester-value">N/A</span>
+            </div>
+            <div class="summary-item">
                 <strong>Total Credits:</strong>
                 <span id="total-credits">0</span>
             </div>
@@ -287,7 +291,7 @@
                 <p>Some courses have prerequisites. Check the ones you've completed below:</p>
                 <div id="prereq-list" style="max-height: 400px; overflow-y: auto;"></div>
                 <div class="modal-buttons">
-                    <button class="btn-secondary" onclick="removeMissingPrereqs()">Replace with Alternatives</button>
+                    <button id="replace-btn" class="btn-secondary" onclick="removeMissingPrereqs()">Replace with Alternatives</button>
                     <button class="btn-primary" onclick="acceptPlanWithPrereqs()">Accept Plan Anyway</button>
                 </div>
             </div>
@@ -297,11 +301,13 @@
     <script>
         let allPlans = [];
         let currentAltIndex = 0;
+        let currentData = null;
 
         document.addEventListener('DOMContentLoaded', () => {
             const result = sessionStorage.getItem('planResult');
             if (result) {
                 const data = JSON.parse(result);
+                currentData = data;
                 displayResults(data);
                 sessionStorage.removeItem('planResult');
             } else {
@@ -359,6 +365,11 @@
             // Update summary
             document.getElementById('total-credits').textContent = plan.total_credits;
             document.getElementById('course-count').textContent = plan.course_count;
+            
+            // Update semester if displaying primary plan
+            if (containerId === 'primary-plan' && currentData && currentData.semester) {
+                document.getElementById('semester-value').textContent = currentData.semester;
+            }
             
             // Display expert advice if available (for primary plan only)
             if (containerId === 'primary-plan' && plan.expert_advice) {
@@ -467,7 +478,7 @@
                         const checkboxId = `prereq-${course.code}-${idx}`;
                         prereqCheckboxes += `
                             <label style="display: block; margin: 5px 0; font-size: 14px;">
-                                <input type="checkbox" id="${checkboxId}" class="prereq-check" data-course="${course.code}">
+                                <input type="checkbox" id="${checkboxId}" class="prereq-check" data-course="${course.code}" onchange="updateReplaceButton()">
                                 <span>${prereq}</span>
                             </label>
                         `;
@@ -482,7 +493,28 @@
                     prereqList.appendChild(item);
                 });
                 
+                // Update button state initially
+                setTimeout(() => updateReplaceButton(), 0);
+                
                 document.getElementById('prereq-modal').classList.add('active');
+            }
+        }
+        
+        function updateReplaceButton() {
+            const replaceBtn = document.getElementById('replace-btn');
+            const allCheckboxes = document.querySelectorAll('.prereq-check');
+            const allChecked = Array.from(allCheckboxes).every(cb => cb.checked);
+            
+            if (allChecked && allCheckboxes.length > 0) {
+                replaceBtn.disabled = true;
+                replaceBtn.style.opacity = '0.5';
+                replaceBtn.style.cursor = 'not-allowed';
+                replaceBtn.textContent = '✓ All Prerequisites Satisfied';
+            } else {
+                replaceBtn.disabled = false;
+                replaceBtn.style.opacity = '1';
+                replaceBtn.style.cursor = 'pointer';
+                replaceBtn.textContent = 'Replace with Alternatives';
             }
         }
 
@@ -528,37 +560,62 @@
                     }
                 });
                 
-                // Replace courses intelligently
+                // Replace courses intelligently while maintaining EXACT credit target
                 let replacedCount = 0;
                 const targetCredits = currentPlan.total_credits;
                 let currentCredits = currentPlan.total_credits;
                 const newCourses = currentPlan.courses.filter(c => !coursesToReplace.some(r => r.code === c.code));
+                const removedCredits = coursesToReplace.reduce((sum, c) => sum + c.credits, 0);
+                const creditsNeeded = removedCredits;
                 
-                for (let i = 0; i < coursesToReplace.length && alternativeCourses.length > 0; i++) {
-                    const courseToReplace = coursesToReplace[i];
-                    const creditDeficit = courseToReplace.credits;
+                // Recursive function to find exact credit match
+                const findExactMatch = (remaining, selectedAlts, startIdx) => {
+                    if (remaining === 0) return selectedAlts;
+                    if (remaining < 0 || startIdx >= alternativeCourses.length) return null;
                     
-                    // Find best alternative matching the credit value
-                    let bestMatch = null;
-                    let bestMatchIndex = -1;
-                    let closestDifference = Infinity;
-                    
-                    for (let j = 0; j < alternativeCourses.length; j++) {
-                        const altCourse = alternativeCourses[j];
-                        const difference = Math.abs(altCourse.credits - creditDeficit);
-                        
-                        if (difference < closestDifference && !newCourses.some(c => c.code === altCourse.code)) {
-                            closestDifference = difference;
-                            bestMatch = altCourse;
-                            bestMatchIndex = j;
+                    for (let i = startIdx; i < alternativeCourses.length; i++) {
+                        const alt = alternativeCourses[i];
+                        if (!newCourses.some(c => c.code === alt.code)) {
+                            const result = findExactMatch(remaining - alt.credits, [...selectedAlts, alt], i + 1);
+                            if (result) return result;
                         }
                     }
-                    
-                    if (bestMatch) {
-                        newCourses.push(bestMatch);
-                        currentCredits = currentCredits - creditDeficit + bestMatch.credits;
-                        alternativeCourses.splice(bestMatchIndex, 1);
-                        replacedCount++;
+                    return null;
+                };
+                
+                const exactMatches = findExactMatch(creditsNeeded, [], 0);
+                
+                if (exactMatches) {
+                    newCourses.push(...exactMatches);
+                    replacedCount = coursesToReplace.length;
+                } else {
+                    // Use closest match if exact not possible
+                    for (let i = 0; i < coursesToReplace.length && alternativeCourses.length > 0; i++) {
+                        const courseToReplace = coursesToReplace[i];
+                        const creditDeficit = courseToReplace.credits;
+                        
+                        // Find best alternative matching the credit value
+                        let bestMatch = null;
+                        let bestMatchIndex = -1;
+                        let closestDifference = Infinity;
+                        
+                        for (let j = 0; j < alternativeCourses.length; j++) {
+                            const altCourse = alternativeCourses[j];
+                            const difference = Math.abs(altCourse.credits - creditDeficit);
+                            
+                            if (difference < closestDifference && !newCourses.some(c => c.code === altCourse.code)) {
+                                closestDifference = difference;
+                                bestMatch = altCourse;
+                                bestMatchIndex = j;
+                            }
+                        }
+                        
+                        if (bestMatch) {
+                            newCourses.push(bestMatch);
+                            currentCredits = currentCredits - creditDeficit + bestMatch.credits;
+                            alternativeCourses.splice(bestMatchIndex, 1);
+                            replacedCount++;
+                        }
                     }
                 }
                 
@@ -567,9 +624,35 @@
                 currentPlan.course_count = newCourses.length;
                 currentPlan.total_credits = newCourses.reduce((sum, c) => sum + c.credits, 0);
                 
+                // Handle credit mismatch with explanation
+                if (currentPlan.total_credits !== targetCredits) {
+                    const creditDiff = currentPlan.total_credits - targetCredits;
+                    const diffText = creditDiff > 0 ? `${creditDiff} more` : `${Math.abs(creditDiff)} fewer`;
+                    
+                    // Add warning to expert advice section
+                    const adviceContainer = document.getElementById('expert-advice');
+                    if (adviceContainer) {
+                        const warningDiv = document.createElement('div');
+                        warningDiv.style.cssText = 'background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; border-radius: 5px; margin-bottom: 15px;';
+                        warningDiv.innerHTML = `
+                            <strong>⚠️ Credit Hours Adjustment</strong>
+                            <p style="margin-top: 10px; font-size: 14px; color: #856404;">
+                                Due to unsatisfied prerequisites, this plan has ${currentPlan.total_credits} credits (${diffText} than your target of ${targetCredits} credits).
+                                The prerequisite constraints prevent an exact credit match. Consider completing prerequisite courses in earlier semesters to meet your exact credit target.
+                            </p>
+                        `;
+                        adviceContainer.insertBefore(warningDiv, adviceContainer.firstChild);
+                    }
+                }
+                
                 displayPlan(currentPlan, 'primary-plan');
                 document.getElementById('prereq-modal').classList.remove('active');
-                alert(`Replaced ${replacedCount} course(s) with alternatives.\nNew Total: ${newCourses.length} courses, ${currentPlan.total_credits} credits`);
+                
+                if (currentPlan.total_credits === targetCredits) {
+                    alert(`Successfully replaced ${replacedCount} course(s) with alternatives.\nTotal Credits: ${currentPlan.total_credits} (exact match maintained)`);
+                } else {
+                    alert(`Successfully replaced ${replacedCount} course(s) with alternatives.\nTotal Credits: ${currentPlan.total_credits} (differs from target of ${targetCredits} due to prerequisite constraints)`);
+                }
             } else {
                 document.getElementById('prereq-modal').classList.remove('active');
             }

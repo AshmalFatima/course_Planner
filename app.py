@@ -71,7 +71,11 @@ def get_courses_for_semester(program_id, semester):
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return render_template("landing.html")
+
+@app.route("/planner")
+def planner():
+    return render_template("planner.html")
 
 @app.route("/result")
 def result():
